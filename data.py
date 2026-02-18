@@ -7,9 +7,9 @@ def generate_random_string(length):
     random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=length))
     return random_string
 
-numOfUserEntries = 100 #100
-numOfFollowEntries = 40 #40
-numOfActivities = 10000 #100
+numOfUserEntries = 100000 #100
+numOfFollowEntries = 40000#40
+numOfActivities = 20000000 #100
 
 # generate data for CircleNetPage
 
