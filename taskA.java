@@ -2,6 +2,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -17,11 +18,12 @@ import java.util.List;
 import javax.naming.Context;
 
 
-//compile and run instrutions I used: 
-// javac -classpath $(hadoop classpath) taskA.java
-// jar cf taskA.jar taskA*.class
-// rm -rf ~/shared_folder/project2/part2/partA/output
-// hadoop jar taskA.jar taskA
+/*compile and run instrutions I used: 
+javac -classpath $(hadoop classpath) taskA.java
+jar cf taskA.jar taskA*.class
+rm -rf ~/shared_folder/project2/part2/partA/output
+hadoop jar taskA.jar taskA
+*/
 
 public class taskA {
     
@@ -30,9 +32,7 @@ public class taskA {
         List<double[]> seedsList = new ArrayList<>();
 
         protected void setup(Context context) throws IOException, InterruptedException {
-            // Load CircleNetPage.txt from Distributed Cache
-           BufferedReader br = new BufferedReader(new FileReader("kseeds.txt"));
-           //BufferedReader br = new BufferedReader(new Path("file:///home/ds503/shared_folder/project2/part2/partA/input/kseeds.txt"));
+            BufferedReader br = new BufferedReader(new FileReader("kseeds.txt"));
 
             String line;
             while ((line = br.readLine()) != null) {
@@ -47,15 +47,14 @@ public class taskA {
             br.close();
         }
 
-        private Double euclideanDistance(double[] point1, double[] point2) {
-            double wDiff = Math.pow(point1[0] - point2[0], 2);
-            double xDiff = Math.pow(point1[1] - point2[1], 2);
-            double yDiff = Math.pow(point1[2] - point2[2], 2);
-            double zDiff = Math.pow(point1[3] - point2[3], 2);
-
-            double result = Math.sqrt(wDiff + xDiff + yDiff + zDiff);
-
-            return result;
+        //combined our inputs with someone elses function
+        private double distanceSquared(double[] p1, double[] p2) {
+            double sum = 0;
+            for (int i = 0; i < 4; i++) {
+                double diff = p1[i] - p2[i];
+                sum += diff * diff;
+            }
+            return sum;
         }
 
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
@@ -68,25 +67,28 @@ public class taskA {
             }
 
             //for each seed in seedsList, calculate distance from point
-            double minDistance = euclideanDistance(pointDoubles, seedsList.get(0));
-            int minDistSeed = 0;
-            for(int i = 1; i < seedsList.size(); i++) {
-                double distance = euclideanDistance(pointDoubles, seedsList.get(i));
-                if(distance < minDistance) {
+
+            int closest = 0; //track closest seed
+            double minDistance = distanceSquared(pointDoubles, seedsList.get(0)); //get distance from first seed to point
+            for (int i = 1; i < seedsList.size(); i++) {
+                double distance = distanceSquared(pointDoubles, seedsList.get(i));
+                if (distance < minDistance) {
                     minDistance = distance;
-                    minDistSeed = i;
+                    closest = i;
                 }
             }
 
             //now we have the index of the seed which the point should go to
             //return <seed, line>
-            String seedText = seedsList.get(minDistSeed).toString();
-            context.write(new Text(seedText), new Text(line));
+            double[] seed = seedsList.get(closest);
+            String centroidKey = seed[0] + "," + seed[1] + "," + seed[2] + "," + seed[3];
+
+            context.write(new Text(centroidKey), value);
         }
     }
 
 
-     public static class taskAReducer extends Reducer<Text,Text,Text,Iterable<Text>> {
+     public static class taskAReducer extends Reducer<Text,Text,Text,NullWritable> {
 
         public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
             String centroid = key.toString(); 
@@ -96,28 +98,21 @@ public class taskA {
             double totalZ = 0;
             int size = 0;
 
-            for(Text val : values) {
-                String[] sList = val.toString().split(","); //one point
-                size++; 
-                for(int i = 0; i < sList.length; i++) { //go through each coordinate in point
-                    double coord = Double.parseDouble(sList[i]);
-                    if(i == 0) {
-                        totalW += coord;
-                    }
-                    else if(i == 1) {
-                        totalX += coord;
-                    }
-                    else if(i == 2) {
-                        totalY += coord;
-                    }
-                    else if(i == 3) {
-                        totalZ += coord;
-                    }
-                }
+            for (Text val : values) {
+                String[] sList = val.toString().split(",");
+                totalW += Double.parseDouble(sList[0]);
+                totalX += Double.parseDouble(sList[1]);
+                totalY += Double.parseDouble(sList[2]);
+                totalZ += Double.parseDouble(sList[3]);
+                size++;
             }
 
-            double[] average = {(totalW / size), (totalX / size), (totalY / size), (totalZ / size)};
-            context.write(new Text(average.toString()), values);
+            String newCentroid =
+                (totalW / size) + "," +
+                (totalX / size) + "," +
+                (totalY / size) + "," +
+                (totalZ / size);
+            context.write(new Text(newCentroid), NullWritable.get()); //text is centroid "id" and nullwritable contains the wxyz coords
         }
     }
 
@@ -137,9 +132,9 @@ public class taskA {
         job.setMapOutputValueClass(Text.class);
 
         job.setOutputKeyClass(Text.class);
-        job.setOutputValueClass(Text.class);
+        job.setOutputValueClass(NullWritable.class);
         
-        FileInputFormat.setInputPaths(job, new Path("file:///home/ds503/shared_folder/project2/part2/partA/input/data.txt"));
+        FileInputFormat.setInputPaths(job, new Path("file:///home/ds503/data.txt"));
         FileOutputFormat.setOutputPath(job, new Path("file:///home/ds503/shared_folder/project2/part2/partA/output"));
 
         boolean result = job.waitForCompletion(true);
