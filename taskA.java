@@ -1,5 +1,7 @@
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.NullWritable;
@@ -12,6 +14,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,8 +24,11 @@ import javax.naming.Context;
 /*compile and run instrutions I used: 
 javac -classpath $(hadoop classpath) taskA.java
 jar cf taskA.jar taskA*.class
-rm -rf ~/shared_folder/project2/part2/partA/output
+hdfs dfs -rm -r -f /user/ds503/project2/part2/output
 hadoop jar taskA.jar taskA
+
+View results:
+hdfs dfs -cat /user/ds503/project2/part2/output/output_iteration_9/part-r-00000
 */
 
 public class taskA {
@@ -32,7 +38,18 @@ public class taskA {
         List<double[]> seedsList = new ArrayList<>();
 
         protected void setup(Context context) throws IOException, InterruptedException {
-            BufferedReader br = new BufferedReader(new FileReader("kseeds.txt"));
+            //BufferedReader br = new BufferedReader(new FileReader("kseeds.txt"));
+            String centroidPath = context.getConfiguration().get("centroid.path");
+
+            //             Configuration conf = new Configuration();
+
+            // conf.set("fs.defaultFS", "hdfs://localhost:9000");
+            Path pathObj = new Path(centroidPath);
+            FileSystem fs = FileSystem.get(context.getConfiguration());
+
+            // FSDataInputStream fsis = fs.open(path);
+            // BufferedReader br = new BufferedReader(new InputStreamReader(fsis));
+            BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(pathObj)));
 
             String line;
             while ((line = br.readLine()) != null) {
@@ -117,27 +134,40 @@ public class taskA {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException {
-        Configuration conf = new Configuration();
-        Job job = Job.getInstance(conf);
 
-        // job.setReduceSpeculativeExecution(false);
+        String centroidPath = "/user/ds503/centroids/centroids.txt";
+        boolean result = true;
+        int k = 10;
 
-        job.setJarByClass(taskA.class);
+        for(int i = 0; i < k; i++) {
 
-        //simple version
-        job.setMapperClass(taskAMapper.class);
-        job.setReducerClass(taskAReducer.class);
-
-        job.setMapOutputKeyClass(Text.class);
-        job.setMapOutputValueClass(Text.class);
-
-        job.setOutputKeyClass(Text.class);
-        job.setOutputValueClass(NullWritable.class);
-        
-        FileInputFormat.setInputPaths(job, new Path("file:///home/ds503/data.txt"));
-        FileOutputFormat.setOutputPath(job, new Path("file:///home/ds503/shared_folder/project2/part2/partA/output"));
-
-        boolean result = job.waitForCompletion(true);
+            Configuration conf = new Configuration();
+            conf.set("centroid.path", centroidPath);
+            Job job = Job.getInstance(conf, "Iteration " + i);
+            
+            // job.setReduceSpeculativeExecution(false);
+    
+            job.setJarByClass(taskA.class);
+    
+            job.setMapperClass(taskAMapper.class);
+            job.setReducerClass(taskAReducer.class);
+    
+            job.setMapOutputKeyClass(Text.class);
+            job.setMapOutputValueClass(Text.class);
+    
+            job.setOutputKeyClass(Text.class);
+            job.setOutputValueClass(NullWritable.class);
+            
+            FileInputFormat.setInputPaths(job, new Path("file:///home/ds503/data.txt"));
+    
+            String outputPath = "/user/ds503/project2/part2/output/output_iteration_" + i;
+            FileOutputFormat.setOutputPath(job, new Path(outputPath));
+    
+            result = job.waitForCompletion(true);
+            
+            centroidPath = outputPath + "/part-r-00000";
+    
+        }
 
         System.exit(result ? 0 : 1);
     }
