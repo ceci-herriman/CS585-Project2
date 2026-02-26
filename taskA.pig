@@ -1,5 +1,3 @@
-
-
 // In python terminal: 
 // sudo scp -P 14226 [pathto]/TaskA.pig ds503@localhost:~/pig
 // sudo scp -P 14226 [pathto]/CircleNetPage.txt ds503@localhost:~/
@@ -8,16 +6,23 @@
 // cd pig
 // pig taskA.pig
 
-A = load 'input/CircleNetPage.txt' using PigStorage('\t') as (id:int, nickname:chararray, job:chararray, regionCode:int, hobby:chararray);
+Pages = LOAD '/home/ds503/CircleNetPage.txt'
+USING PigStorage(',')
+AS (
+    id:int,
+    userNickname:chararray,
+    userJob:chararray,
+    userRegionCode:int,
+    userHobby:chararray
+);
 
-B = foreach A generate id, hobby;
+GroupedPages = GROUP Pages BY userHobby;
 
-C = group B by hobby;
+PageAccessCounts = FOREACH GroupedPages
+    GENERATE
+        group,
+        COUNT(Pages) AS accessCount;
 
-D = foreach C generate group as hobby, COUNT(B) as count;
-
-STORE D into 'output/TaskA_output' using PigStorage('\t');
-
-
-
-
+STORE FinalResult
+INTO '/home/ds503/shared_folder/project1/taskA/output'
+USING PigStorage(',');;
