@@ -8,26 +8,16 @@
 // cd pig
 // pig taskA.pig
 
-Pages = LOAD '/home/ds503/CircleNetPage.txt'
-USING PigStorage(',')
-AS (
-    id:int,
-    userNickname:chararray,
-    userJob:chararray,
-    userRegionCode:int,
-    userHobby:chararray
-);
+A = load 'input/CircleNetPage.txt' using PigStorage('\t') as (id:int, nickname:chararray, job:chararray, regionCode:int, hobby:chararray);
 
-GroupedPages = GROUP Pages BY userHobby;
+B = foreach A generate id, hobby;
 
-PageAccessCounts = FOREACH GroupedPages
-    GENERATE
-        group,
-        COUNT(Pages) AS accessCount;
+C = group B by hobby;
 
-STORE FinalResult
-INTO '/home/ds503/shared_folder/project1/taskA/output'
-USING PigStorage(',');;
+D = foreach C generate group as hobby, COUNT(B) as count;
+
+STORE D into 'output/TaskA_output' using PigStorage('\t');
+
 
 
 
