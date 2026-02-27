@@ -15,25 +15,23 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.List;
-
-import javax.naming.Context;
-
+import java.util.*;
+import java.net.URI;
 
 /*compile and run instrutions I used: 
-javac -classpath $(hadoop classpath) taskA.java
-jar cf taskA.jar taskA*.class
-hdfs dfs -rm -r -f /user/ds503/project2/part2/output
-hadoop jar taskA.jar taskA
+javac -classpath $(hadoop classpath) taskC.java
+jar cf taskC.jar taskC*.class
+hdfs dfs -rm -r -f /user/ds503/project2/part2/partC/output
+hadoop jar taskC.jar taskC
 
 View results:
-hdfs dfs -cat /user/ds503/project2/part2/output/output_iteration_9/part-r-00000
+hdfs dfs -cat /user/ds503/project2/part2/partC/output/output_iteration_1/part-r-00000
+hdfs dfs -cat /user/ds503/project2/part2/partC/silhouetteOutput/part-r-00000
 */
 
-public class taskA {
+public class taskC {
     
-    public static class taskAMapper extends Mapper<Object, Text, Text, Text>{
+    public static class taskCMapper extends Mapper<Object, Text, Text, Text>{
         List<double[]> seedsList = new ArrayList<>();
 
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -89,7 +87,7 @@ public class taskA {
         }
     }
 
-     public static class taskAReducer extends Reducer<Text,Text,Text,NullWritable> {
+     public static class taskCReducer extends Reducer<Text,Text,Text,NullWritable> {
 
         public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
             String centroid = key.toString(); 
@@ -149,7 +147,7 @@ public class taskA {
         return centroidsList;
     }
 
-    public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException {
+    public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException, java.net.URISyntaxException {
 
         String centroidPath = "/user/ds503/centroids/centroids.txt";
         boolean result = true;
@@ -176,10 +174,10 @@ public class taskA {
             
             // job.setReduceSpeculativeExecution(false);
     
-            job.setJarByClass(taskA.class);
+            job.setJarByClass(taskC.class);
     
-            job.setMapperClass(taskAMapper.class);
-            job.setReducerClass(taskAReducer.class);
+            job.setMapperClass(taskCMapper.class);
+            job.setReducerClass(taskCReducer.class);
     
             job.setMapOutputKeyClass(Text.class);
             job.setMapOutputValueClass(Text.class);
@@ -189,7 +187,7 @@ public class taskA {
             
             FileInputFormat.setInputPaths(job, new Path("file:///home/ds503/data.txt"));
     
-            String outputPath = "/user/ds503/project2/part2/output/output_iteration_" + i;
+            String outputPath = "/user/ds503/project2/part2/partC/output/output_iteration_" + i;
             FileOutputFormat.setOutputPath(job, new Path(outputPath));
     
             result = job.waitForCompletion(true);

@@ -21,11 +21,12 @@ import java.net.URI;
 /*compile and run instrutions I used: 
 javac -classpath $(hadoop classpath) taskB.java
 jar cf taskB.jar taskB*.class
-hdfs dfs -rm -r -f /user/ds503/project2/part2/output
+hdfs dfs -rm -r -f /user/ds503/project2/part2/partB/output
 hadoop jar taskB.jar taskB
 
 View results:
-hdfs dfs -cat /user/ds503/project2/part2/output/output_iteration_9/part-r-00000
+hdfs dfs -cat /user/ds503/project2/part2/partB/output/output_iteration_9/part-r-00000
+hdfs dfs -cat /user/ds503/project2/part2/partB/silhouetteOutput/part-r-00000
 */
 
 public class taskB {
@@ -285,11 +286,6 @@ public class taskB {
         }
     }
 
-
-
-
-
-
     public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException, java.net.URISyntaxException {
 
         String centroidPath = "/user/ds503/centroids/centroids.txt";
@@ -317,7 +313,7 @@ public class taskB {
             
             FileInputFormat.setInputPaths(job, new Path("file:///home/ds503/data.txt"));
     
-            String outputPath = "/user/ds503/project2/part2/output/output_iteration_" + i;
+            String outputPath = "/user/ds503/project2/part2/partB/output/output_iteration_" + i;
             FileOutputFormat.setOutputPath(job, new Path(outputPath));
     
             result = job.waitForCompletion(true);
@@ -347,8 +343,8 @@ public class taskB {
         job2.setOutputValueClass(NullWritable.class);
 
         FileInputFormat.setInputPaths(job2, new Path("file:///home/ds503/data.txt"));
-        job2.addCacheFile(new URI("/user/ds503/project2/part2/output/output_iteration_9/part-r-00000")); // add final interation output of job 1 to cache
-        FileOutputFormat.setOutputPath(job2, new Path("/user/ds503/project2/part2/silhouetteOutput"));
+        job2.addCacheFile(new URI("/user/ds503/project2/part2/partB/output/output_iteration_9/part-r-00000")); // add final interation output of job 1 to cache
+        FileOutputFormat.setOutputPath(job2, new Path("/user/ds503/project2/part2/partB/silhouetteOutput"));
 
         boolean result2 = job2.waitForCompletion(true);
 
