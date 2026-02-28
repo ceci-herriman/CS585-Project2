@@ -1,5 +1,6 @@
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.NullWritable;
@@ -12,6 +13,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,7 +34,9 @@ public class taskA {
         List<double[]> seedsList = new ArrayList<>();
 
         protected void setup(Context context) throws IOException, InterruptedException {
-            BufferedReader br = new BufferedReader(new FileReader("kseeds.txt"));
+            Path pathObj = new Path("/user/ds503/centroids/kseeds.txt");
+            FileSystem fs = FileSystem.get(context.getConfiguration());
+            BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(pathObj)));
 
             String line;
             while ((line = br.readLine()) != null) {
@@ -47,14 +51,13 @@ public class taskA {
             br.close();
         }
 
-        //combined our inputs with someone elses function
-        private double distanceSquared(double[] p1, double[] p2) {
+        private double euclideanDistance(double[] p1, double[] p2) {
             double sum = 0;
             for (int i = 0; i < 4; i++) {
                 double diff = p1[i] - p2[i];
                 sum += diff * diff;
             }
-            return sum;
+            return Math.sqrt(sum);
         }
 
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
@@ -69,9 +72,9 @@ public class taskA {
             //for each seed in seedsList, calculate distance from point
 
             int closest = 0; //track closest seed
-            double minDistance = distanceSquared(pointDoubles, seedsList.get(0)); //get distance from first seed to point
+            double minDistance = euclideanDistance(pointDoubles, seedsList.get(0)); //get distance from first seed to point
             for (int i = 1; i < seedsList.size(); i++) {
-                double distance = distanceSquared(pointDoubles, seedsList.get(i));
+                double distance = euclideanDistance(pointDoubles, seedsList.get(i));
                 if (distance < minDistance) {
                     minDistance = distance;
                     closest = i;
@@ -117,10 +120,12 @@ public class taskA {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException {
+
         Configuration conf = new Configuration();
         Job job = Job.getInstance(conf);
 
         // job.setReduceSpeculativeExecution(false);
+        long startTime = System.nanoTime();
 
         job.setJarByClass(taskA.class);
 
@@ -138,6 +143,10 @@ public class taskA {
         FileOutputFormat.setOutputPath(job, new Path("file:///home/ds503/shared_folder/project2/part2/partA/output"));
 
         boolean result = job.waitForCompletion(true);
+
+        long endTime = System.nanoTime();
+        double durationMilli = (double) (endTime - startTime) / 1000000.0;
+        System.out.println("Time to complete in milliseconds: " + durationMilli);
 
         System.exit(result ? 0 : 1);
     }
