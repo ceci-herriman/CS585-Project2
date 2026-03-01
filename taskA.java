@@ -1,5 +1,6 @@
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.NullWritable;
@@ -14,6 +15,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.*;
 import java.net.URI;
+import java.io.InputStreamReader;
 
 /*compile and run instrutions I used:
 javac -classpath $(hadoop classpath) taskA.java
@@ -57,7 +59,9 @@ public class taskA {
         List<double[]> seedsList = new ArrayList<>();
 
         protected void setup(Context context) throws IOException, InterruptedException {
-            BufferedReader br = new BufferedReader(new FileReader("kseeds.txt"));
+            Path pathObj = new Path("/user/ds503/centroids/kseeds.txt");
+            FileSystem fs = FileSystem.get(context.getConfiguration());
+            BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(pathObj)));
 
             String line;
             while ((line = br.readLine()) != null) {
@@ -267,9 +271,13 @@ public class taskA {
 
     // DRIVER
     public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException, java.net.URISyntaxException {
+
         // KNN JOB
         Configuration conf = new Configuration();
         Job job = Job.getInstance(conf);
+
+        // job.setReduceSpeculativeExecution(false);
+        long startTime = System.nanoTime();
 
         job.setJarByClass(taskA.class);
 
@@ -315,5 +323,8 @@ public class taskA {
         boolean result2 = job2.waitForCompletion(true);
 
         System.exit(result2 ? 0 : 1);
+        long endTime = System.nanoTime();
+        double durationMilli = (double) (endTime - startTime) / 1000000.0;
+        System.out.println("Time to complete in milliseconds: " + durationMilli);
     }
 }
