@@ -18,6 +18,8 @@ import java.net.URI;
 import java.io.InputStreamReader;
 
 /*compile and run instrutions I used:
+hdfs dfs -rm -r -f /user/ds503/centroids/kseeds.txt
+
 javac -classpath $(hadoop classpath) taskA.java
 jar cf taskA.jar taskA*.class
 rm -rf ~/shared_folder/project2/part2/partA/output
@@ -31,7 +33,7 @@ cat ~/shared_folder/project2/part2/partA/silhouetteOutput/part-r-00000
 
 public class taskA {
     // SHARED MATH - EUCLIDEAN DISTANCE
-    int numDimensions = 4; //default
+    int numDimensions = numDimensions; //default
 
     // combined our inputs with someone elses function
     private static double euclideanDistance(double[] p1, double[] p2) {
@@ -273,7 +275,7 @@ public class taskA {
 
     // DRIVER
     public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException, java.net.URISyntaxException {
-
+        numDimensions = 2;
         // KNN JOB
         Configuration conf = new Configuration();
         Job job = Job.getInstance(conf);

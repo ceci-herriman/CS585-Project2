@@ -18,7 +18,9 @@ import java.io.InputStreamReader;
 import java.util.*;
 import java.net.URI;
 
-/*compile and run instrutions I used: 
+/*compile and run instrutions I used:
+hdfs dfs -rm -r -f /user/ds503/centroids/kseeds.txt
+
 javac -classpath $(hadoop classpath) taskE.java
 jar cf taskE.jar taskE*.class
 hdfs dfs -rm -r -f /user/ds503/project2/part2/partE/output
@@ -376,7 +378,8 @@ public class taskE {
 
     // DRIVER
     public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException, java.net.URISyntaxException {
-
+        numDimensions = 2;
+        
         String centroidPath = "/user/ds503/centroids/centroids.txt";
         boolean result = true;
         int k = 3;

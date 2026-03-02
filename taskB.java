@@ -18,7 +18,9 @@ import java.io.InputStreamReader;
 import java.util.*;
 import java.net.URI;
 
-/*compile and run instrutions I used: 
+/*compile and run instrutions I used:
+hdfs dfs -rm -r -f /user/ds503/centroids/kseeds.txt
+
 javac -classpath $(hadoop classpath) taskB.java
 jar cf taskB.jar taskB*.class
 hdfs dfs -rm -r -f /user/ds503/project2/part2/partB/output
@@ -37,7 +39,7 @@ public class taskB {
     // combined our inputs with someone elses function
     private static double euclideanDistance(double[] p1, double[] p2) {
         double sum = 0;
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < numDimensions; i++) {
             double diff = p1[i] - p2[i];
             sum += diff * diff;
         }
@@ -78,9 +80,9 @@ public class taskB {
             String line;
             while ((line = br.readLine()) != null) {
                 String[] vals = line.split(",");
-                double[] pointDoubles = new double[4];
+                double[] pointDoubles = new double[numDimensions];
 
-                for (int i = 0; i < 4; i++) {
+                for (int i = 0; i < numDimensions; i++) {
                     pointDoubles[i] = Double.parseDouble(vals[i]);
                 }
                 seedsList.add(pointDoubles);
@@ -91,9 +93,9 @@ public class taskB {
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
             String line = value.toString();
             String[] vals = line.split(",");
-            double[] pointDoubles = new double[4];
+            double[] pointDoubles = new double[numDimensions];
 
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < numDimensions; i++) {
                 pointDoubles[i] = Double.parseDouble(vals[i]);
             }
 
@@ -170,8 +172,8 @@ public class taskB {
             String line;
             while ((line = br.readLine()) != null) {
                 String[] vals = line.split(",");
-                double[] centroidDoubles = new double[4];
-                for (int i = 0; i < 4; i++) {
+                double[] centroidDoubles = new double[numDimensions];
+                for (int i = 0; i < numDimensions; i++) {
                     centroidDoubles[i] = Double.parseDouble(vals[i]);
                 }
                 allCentroids.add(centroidDoubles);
@@ -182,9 +184,9 @@ public class taskB {
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
             String line = value.toString();
             String[] vals = line.split(",");
-            double[] pointDoubles = new double[4];
+            double[] pointDoubles = new double[numDimensions];
 
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < numDimensions; i++) {
                 pointDoubles[i] = Double.parseDouble(vals[i]);
             }
 
@@ -227,8 +229,8 @@ public class taskB {
                 if (line.isEmpty())
                     continue;
                 String[] vals = line.split(",");
-                double[] centroidDouble = new double[4];
-                for (int i = 0; i < 4; i++) {
+                double[] centroidDouble = new double[numDimensions];
+                for (int i = 0; i < numDimensions; i++) {
                     centroidDouble[i] = Double.parseDouble(vals[i]);
                 }
                 allCentroids.add(centroidDouble);
@@ -239,16 +241,16 @@ public class taskB {
         public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
             // get cluster's centroid from key
             String[] keyVals = key.toString().split(",");
-            double[] currentCentroid = new double[4];
-            for (int i = 0; i < 4; i++) {
+            double[] currentCentroid = new double[numDimensions];
+            for (int i = 0; i < numDimensions; i++) {
                 currentCentroid[i] = Double.parseDouble(keyVals[i]);
             }
 
             List<double[]> clusterPoints = new ArrayList<>();
             for (Text val : values) {
                 String[] valueStrings = val.toString().trim().split(",");
-                double[] pointDoubles = new double[4];
-                for (int i = 0; i < 4; i++) {
+                double[] pointDoubles = new double[numDimensions];
+                for (int i = 0; i < numDimensions; i++) {
                     pointDoubles[i] = Double.parseDouble(valueStrings[i]);
                 }
                 clusterPoints.add(pointDoubles);
@@ -290,7 +292,8 @@ public class taskB {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException, java.net.URISyntaxException {
-
+        numDimensions = 2;
+        
         String centroidPath = "/user/ds503/centroids/centroids.txt";
         boolean result = true;
         int k = 10;
