@@ -33,7 +33,7 @@ cat ~/shared_folder/project2/part2/partA/silhouetteOutput/part-r-00000
 
 public class taskA {
     // SHARED MATH - EUCLIDEAN DISTANCE
-    int numDimensions = numDimensions; //default
+    private static int numDimensions = numDimensions; //default
 
     // combined our inputs with someone elses function
     private static double euclideanDistance(double[] p1, double[] p2) {

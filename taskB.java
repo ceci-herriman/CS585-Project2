@@ -34,7 +34,7 @@ hdfs dfs -cat /user/ds503/project2/part2/partB/silhouetteOutput/part-r-00000
 
 public class taskB {
     // SHARED MATH - EUCLIDEAN DISTANCE
-    int numDimensions = 4; //default
+    private static int numDimensions = 2; // default
 
     // combined our inputs with someone elses function
     private static double euclideanDistance(double[] p1, double[] p2) {
@@ -66,8 +66,7 @@ public class taskB {
         protected void setup(Context context) throws IOException, InterruptedException {
             //BufferedReader br = new BufferedReader(new FileReader("kseeds.txt"));
             String centroidPath = context.getConfiguration().get("centroid.path");
-
-            //             Configuration conf = new Configuration();
+            numDimensions = context.getConfiguration().getInt("numDimensions", numDimensions);
 
             // conf.set("fs.defaultFS", "hdfs://localhost:9000");
             Path pathObj = new Path(centroidPath);
@@ -100,7 +99,6 @@ public class taskB {
             }
 
             //for each seed in seedsList, calculate distance from point
-
             int closest = 0; //track closest seed
             double minDistance = euclideanDistance(pointDoubles, seedsList.get(0)); //get distance from first seed to point
             for (int i = 1; i < seedsList.size(); i++) {
@@ -114,9 +112,14 @@ public class taskB {
             //now we have the index of the seed which the point should go to
             //return <seed, line>
             double[] seed = seedsList.get(closest);
-            String centroidKey = seed[0] + "," + seed[1] + "," + seed[2] + "," + seed[3];
+            StringBuilder centroidKey = new StringBuilder();
 
-            context.write(new Text(centroidKey), value);
+            for (int i = 0; i < seed.length; i++) {
+                if (i > 0) centroidKey.append(",");  // add comma between values
+                centroidKey.append(seed[i]);
+            }
+
+            context.write(new Text(centroidKey.toString()), value);
         }
     }
 
@@ -124,32 +127,26 @@ public class taskB {
     public static class taskBReducer extends Reducer<Text,Text,Text,NullWritable> {
 
         public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
-            String centroid = key.toString(); 
-            double totalW = 0;
-            double totalX = 0;
-            double totalY = 0;
-            double totalZ = 0;
+            double[] totals = new double[numDimensions];
             int size = 0;
 
             for (Text val : values) {
                 String[] sList = val.toString().split(",");
-                totalW += Double.parseDouble(sList[0]);
-                totalX += Double.parseDouble(sList[1]);
-                totalY += Double.parseDouble(sList[2]);
-                totalZ += Double.parseDouble(sList[3]);
+                for (int i = 0; i < numDimensions; i++) {
+                    totals[i] += Double.parseDouble(sList[i]);
+                }
                 size++;
             }
 
-            String newCentroid =
-                (totalW / size) + "," +
-                (totalX / size) + "," +
-                (totalY / size) + "," +
-                (totalZ / size);
-            context.write(new Text(newCentroid), NullWritable.get()); //text is centroid "id" and nullwritable contains the wxyz coords
+            StringBuilder newCentroid = new StringBuilder();
+            for (int i = 0; i < numDimensions; i++) {
+                if (i > 0) newCentroid.append(",");
+                newCentroid.append(totals[i] / size);
+            }
+
+            context.write(new Text(newCentroid.toString()), NullWritable.get());
         }
     }
-
-
 
     /*
         SILHOUETTE ANALYSIS
@@ -166,6 +163,7 @@ public class taskB {
                 throw new IOException("No centroid file found in distributed cache.");
             }
             String centroidFileName = new Path(cacheFiles[0].toString()).getName();
+            numDimensions = context.getConfiguration().getInt("numDimensions", numDimensions);
 
             // modified from taskBMapper
             BufferedReader br = new BufferedReader(new FileReader(centroidFileName));
@@ -204,9 +202,13 @@ public class taskB {
             // now we have the index of which cluster the point belongs to
             // return <seed, line>
             double[] seed = allCentroids.get(closest);
-            String clusterKey = seed[0] + "," + seed[1] + "," + seed[2] + "," + seed[3];
+            StringBuilder centroidKey = new StringBuilder();
+            for (int i = 0; i < seed.length; i++) {
+                if (i > 0) centroidKey.append(",");
+                centroidKey.append(seed[i]);
+            }
 
-            context.write(new Text(clusterKey), value);
+            context.write(new Text(centroidKey.toString()), value);
         }
     }
 
@@ -221,6 +223,7 @@ public class taskB {
                 throw new IOException("No centroid file found in distributed cache.");
             }
             String centroidFileName = new Path(cacheFiles[0].toString()).getName();
+            numDimensions = context.getConfiguration().getInt("numDimensions", numDimensions);
 
             // similar to taskBMapper setup
             BufferedReader br = new BufferedReader(new FileReader(centroidFileName));
@@ -296,13 +299,15 @@ public class taskB {
         
         String centroidPath = "/user/ds503/centroids/centroids.txt";
         boolean result = true;
-        int k = 10;
+        int k = 5;
         long startTime = System.nanoTime();
 
         for(int i = 0; i < k; i++) {
 
             Configuration conf = new Configuration();
             conf.set("centroid.path", centroidPath);
+            conf.setInt("numDimensions", numDimensions);
+
             Job job = Job.getInstance(conf, "Iteration " + i);
             
             // job.setReduceSpeculativeExecution(false);           
@@ -339,6 +344,7 @@ public class taskB {
         // SILOHUETTE JOB
         Configuration conf2 = new Configuration();
         Job job2 = Job.getInstance(conf2);
+        conf2.setInt("numDimensions", numDimensions);
                         
         long startTime2 = System.nanoTime();
 
@@ -355,7 +361,7 @@ public class taskB {
         job2.setOutputValueClass(NullWritable.class);
 
         FileInputFormat.setInputPaths(job2, new Path("file:///home/ds503/data.txt"));
-        job2.addCacheFile(new URI("/user/ds503/project2/part2/partB/output/output_iteration_9/part-r-00000")); // add final interation output of job 1 to cache
+        job2.addCacheFile(new URI(centroidPath)); // add final interation output of job 1 to cache
         FileOutputFormat.setOutputPath(job2, new Path("/user/ds503/project2/part2/partB/silhouetteOutput"));
 
         boolean result2 = job2.waitForCompletion(true);
