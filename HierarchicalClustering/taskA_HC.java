@@ -255,8 +255,7 @@ public class taskA_HC {
         double durationMilli = (double) (endTime - startTime) / 1000000.0;
 
         // taskA, taskB, taskC -
-        // since there's no calculating averages between centroids using
-        // single-linkage, the number of rounds/iterations is always the same
+        // number of iterations is always the same (keep merging until 1 cluster exists is what HC is)
         System.out.println("Number of rounds to complete: " + round);
         System.out.println("Time to complete in milliseconds: " + durationMilli);
 
