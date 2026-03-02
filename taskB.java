@@ -294,7 +294,6 @@ public class taskB {
         int k = 10;
         long startTime = System.nanoTime();
 
-
         for(int i = 0; i < k; i++) {
 
             Configuration conf = new Configuration();
@@ -324,13 +323,19 @@ public class taskB {
     
         }
 
-               if (!result) {
+        long endTime = System.nanoTime();
+        double durationMilli = (double) (endTime - startTime) / 1000000.0;
+        System.out.println("Time to complete in milliseconds: " + durationMilli);
+
+        if (!result) {
             System.exit(1);
         }
 
         // SILOHUETTE JOB
         Configuration conf2 = new Configuration();
         Job job2 = Job.getInstance(conf2);
+                        
+        long startTime2 = System.nanoTime();
 
         job2.setJarByClass(taskB.class);
 
@@ -349,11 +354,11 @@ public class taskB {
         FileOutputFormat.setOutputPath(job2, new Path("/user/ds503/project2/part2/partB/silhouetteOutput"));
 
         boolean result2 = job2.waitForCompletion(true);
-
-        long endTime = System.nanoTime();
-        double durationMilli = (double) (endTime - startTime) / 1000000.0;
-        System.out.println("Time to complete in milliseconds: " + durationMilli);
                 
+        long endTime2 = System.nanoTime();
+        durationMilli = (double) (endTime2 - startTime2) / 1000000.0;
+        System.out.println("Time to complete in milliseconds: " + durationMilli);
+
         System.exit(result2 ? 0 : 1);
 
     }
