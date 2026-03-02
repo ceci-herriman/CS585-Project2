@@ -31,12 +31,10 @@ cat ~/shared_folder/project2/part2/partA/silhouetteOutput/part-r-00000
 
 public class taskA {
     // SHARED MATH - EUCLIDEAN DISTANCE
-    int numDimensions = 4; //default
-
     // combined our inputs with someone elses function
     private static double euclideanDistance(double[] p1, double[] p2) {
         double sum = 0;
-        for (int i = 0; i < numDimensions; i++) {
+        for (int i = 0; i < 4; i++) {
             double diff = p1[i] - p2[i];
             sum += diff * diff;
         }
@@ -68,9 +66,9 @@ public class taskA {
             String line;
             while ((line = br.readLine()) != null) {
                 String[] vals = line.split(",");
-                double[] pointDoubles = new double[numDimensions];
+                double[] pointDoubles = new double[4];
 
-                for (int i = 0; i < numDimensions; i++) {
+                for (int i = 0; i < 4; i++) {
                     pointDoubles[i] = Double.parseDouble(vals[i]);
                 }
                 seedsList.add(pointDoubles);
@@ -81,9 +79,9 @@ public class taskA {
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
             String line = value.toString();
             String[] vals = line.split(",");
-            double[] pointDoubles = new double[numDimensions];
+            double[] pointDoubles = new double[4];
 
-            for (int i = 0; i < numDimensions; i++) {
+            for (int i = 0; i < 4; i++) {
                 pointDoubles[i] = Double.parseDouble(vals[i]);
             }
 
@@ -152,8 +150,8 @@ public class taskA {
             String line;
             while ((line = br.readLine()) != null) {
                 String[] vals = line.split(",");
-                double[] centroidDoubles = new double[numDimensions];
-                for (int i = 0; i < numDimensions; i++) {
+                double[] centroidDoubles = new double[4];
+                for (int i = 0; i < 4; i++) {
                     centroidDoubles[i] = Double.parseDouble(vals[i]);
                 }
                 allCentroids.add(centroidDoubles);
@@ -164,9 +162,9 @@ public class taskA {
         public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
             String line = value.toString();
             String[] vals = line.split(",");
-            double[] pointDoubles = new double[numDimensions];
+            double[] pointDoubles = new double[4];
 
-            for (int i = 0; i < numDimensions; i++) {
+            for (int i = 0; i < 4; i++) {
                 pointDoubles[i] = Double.parseDouble(vals[i]);
             }
 
@@ -209,8 +207,8 @@ public class taskA {
                 if (line.isEmpty())
                     continue;
                 String[] vals = line.split(",");
-                double[] centroidDouble = new double[numDimensions];
-                for (int i = 0; i < numDimensions; i++) {
+                double[] centroidDouble = new double[4];
+                for (int i = 0; i < 4; i++) {
                     centroidDouble[i] = Double.parseDouble(vals[i]);
                 }
                 allCentroids.add(centroidDouble);
@@ -221,16 +219,16 @@ public class taskA {
         public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
             // get cluster's centroid from key
             String[] keyVals = key.toString().split(",");
-            double[] currentCentroid = new double[numDimensions];
-            for (int i = 0; i < numDimensions; i++) {
+            double[] currentCentroid = new double[4];
+            for (int i = 0; i < 4; i++) {
                 currentCentroid[i] = Double.parseDouble(keyVals[i]);
             }
 
             List<double[]> clusterPoints = new ArrayList<>();
             for (Text val : values) {
                 String[] valueStrings = val.toString().trim().split(",");
-                double[] pointDoubles = new double[numDimensions];
-                for (int i = 0; i < numDimensions; i++) {
+                double[] pointDoubles = new double[4];
+                for (int i = 0; i < 4; i++) {
                     pointDoubles[i] = Double.parseDouble(valueStrings[i]);
                 }
                 clusterPoints.add(pointDoubles);
