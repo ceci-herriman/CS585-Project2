@@ -320,7 +320,7 @@ public class taskC {
         String centroidPath = "/user/ds503/centroids/centroids.txt";
         boolean result = true;
         int k = 40;
-        int threshold = 2000;
+        int threshold = 2;
         long startTime = System.nanoTime();
 
 
