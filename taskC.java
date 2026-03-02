@@ -22,6 +22,7 @@ import java.net.URI;
 javac -classpath $(hadoop classpath) taskC.java
 jar cf taskC.jar taskC*.class
 hdfs dfs -rm -r -f /user/ds503/project2/part2/partC/output
+hdfs dfs -rm -r -f /user/ds503/project2/part2/partC/silhouetteOutput
 hadoop jar taskC.jar taskC
 
 View results:
@@ -302,15 +303,14 @@ public class taskC {
         }
     }
 
-
-
-
     public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException, java.net.URISyntaxException {
 
         String centroidPath = "/user/ds503/centroids/centroids.txt";
         boolean result = true;
         int k = 15;
         int threshold = 2000;
+        long startTime = System.nanoTime();
+
 
         List<double[]> prevCentroids = new ArrayList<>();
         List<double[]> currCentroids = new ArrayList<>();
@@ -412,6 +412,10 @@ public class taskC {
 
         boolean result2 = job2.waitForCompletion(true);
 
+        long endTime = System.nanoTime();
+        double durationMilli = (double) (endTime - startTime) / 1000000.0;
+        System.out.println("Time to complete in milliseconds: " + durationMilli);
+                
         System.exit(result2 ? 0 : 1);
     }
 }

@@ -22,6 +22,7 @@ import java.net.URI;
 javac -classpath $(hadoop classpath) taskB.java
 jar cf taskB.jar taskB*.class
 hdfs dfs -rm -r -f /user/ds503/project2/part2/partB/output
+hdfs dfs -rm -r -f /user/ds503/project2/part2/partB/silhouetteOutput
 hadoop jar taskB.jar taskB
 
 View results:
@@ -291,6 +292,8 @@ public class taskB {
         String centroidPath = "/user/ds503/centroids/centroids.txt";
         boolean result = true;
         int k = 10;
+        long startTime = System.nanoTime();
+
 
         for(int i = 0; i < k; i++) {
 
@@ -298,8 +301,7 @@ public class taskB {
             conf.set("centroid.path", centroidPath);
             Job job = Job.getInstance(conf, "Iteration " + i);
             
-            // job.setReduceSpeculativeExecution(false);
-    
+            // job.setReduceSpeculativeExecution(false);           
             job.setJarByClass(taskB.class);
     
             job.setMapperClass(taskBMapper.class);
@@ -348,6 +350,11 @@ public class taskB {
 
         boolean result2 = job2.waitForCompletion(true);
 
+        long endTime = System.nanoTime();
+        double durationMilli = (double) (endTime - startTime) / 1000000.0;
+        System.out.println("Time to complete in milliseconds: " + durationMilli);
+                
         System.exit(result2 ? 0 : 1);
+
     }
 }
