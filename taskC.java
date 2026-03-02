@@ -34,7 +34,7 @@ hdfs dfs -cat /user/ds503/project2/part2/partC/silhouetteOutput/part-r-00000
 
 public class taskC {
     // SHARED MATH - EUCLIDEAN DISTANCE
-    int numDimensions = 4; //default
+    private static int numDimensions = 2; // default
 
     // combined our inputs with someone elses function
     private static double euclideanDistance(double[] p1, double[] p2) {
@@ -66,6 +66,7 @@ public class taskC {
         protected void setup(Context context) throws IOException, InterruptedException {
             //BufferedReader br = new BufferedReader(new FileReader("kseeds.txt"));
             String centroidPath = context.getConfiguration().get("centroid.path");
+            numDimensions = context.getConfiguration().getInt("numDimensions", numDimensions);
 
             Path pathObj = new Path(centroidPath);
             FileSystem fs = FileSystem.get(context.getConfiguration());
@@ -95,7 +96,6 @@ public class taskC {
             }
 
             //for each seed in seedsList, calculate distance from point
-
             int closest = 0; //track closest seed
             double minDistance = euclideanDistance(pointDoubles, seedsList.get(0)); //get distance from first seed to point
             for (int i = 1; i < seedsList.size(); i++) {
@@ -109,9 +109,14 @@ public class taskC {
             //now we have the index of the seed which the point should go to
             //return <seed, line>
             double[] seed = seedsList.get(closest);
-            String centroidKey = seed[0] + "," + seed[1] + "," + seed[2] + "," + seed[3];
+            StringBuilder centroidKey = new StringBuilder();
 
-            context.write(new Text(centroidKey), value);
+            for (int i = 0; i < seed.length; i++) {
+                if (i > 0) centroidKey.append(",");  // add comma between values
+                centroidKey.append(seed[i]);
+            }
+
+            context.write(new Text(centroidKey.toString()), value);
         }
     }
 
@@ -119,28 +124,24 @@ public class taskC {
      public static class taskCReducer extends Reducer<Text,Text,Text,NullWritable> {
 
         public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
-            String centroid = key.toString(); 
-            double totalW = 0;
-            double totalX = 0;
-            double totalY = 0;
-            double totalZ = 0;
+            double[] totals = new double[numDimensions];
             int size = 0;
 
             for (Text val : values) {
                 String[] sList = val.toString().split(",");
-                totalW += Double.parseDouble(sList[0]);
-                totalX += Double.parseDouble(sList[1]);
-                totalY += Double.parseDouble(sList[2]);
-                totalZ += Double.parseDouble(sList[3]);
+                for (int i = 0; i < numDimensions; i++) {
+                    totals[i] += Double.parseDouble(sList[i]);
+                }
                 size++;
             }
 
-            String newCentroid =
-                (totalW / size) + "," +
-                (totalX / size) + "," +
-                (totalY / size) + "," +
-                (totalZ / size);
-            context.write(new Text(newCentroid), NullWritable.get()); //text is centroid "id" and nullwritable contains the wxyz coords
+            StringBuilder newCentroid = new StringBuilder();
+            for (int i = 0; i < numDimensions; i++) {
+                if (i > 0) newCentroid.append(",");
+                newCentroid.append(totals[i] / size);
+            }
+
+            context.write(new Text(newCentroid.toString()), NullWritable.get());
         }
     }
     
@@ -182,8 +183,9 @@ public class taskC {
                 throw new IOException("No centroid file found in distributed cache.");
             }
             String centroidFileName = new Path(cacheFiles[0].toString()).getName();
+            numDimensions = context.getConfiguration().getInt("numDimensions", numDimensions);
 
-            // modified from taskCMapper
+            // modified from taskBMapper
             BufferedReader br = new BufferedReader(new FileReader(centroidFileName));
             String line;
             while ((line = br.readLine()) != null) {
@@ -220,9 +222,13 @@ public class taskC {
             // now we have the index of which cluster the point belongs to
             // return <seed, line>
             double[] seed = allCentroids.get(closest);
-            String clusterKey = seed[0] + "," + seed[1] + "," + seed[2] + "," + seed[3];
+            StringBuilder centroidKey = new StringBuilder();
+            for (int i = 0; i < seed.length; i++) {
+                if (i > 0) centroidKey.append(",");
+                centroidKey.append(seed[i]);
+            }
 
-            context.write(new Text(clusterKey), value);
+            context.write(new Text(centroidKey.toString()), value);
         }
     }
 
@@ -237,8 +243,9 @@ public class taskC {
                 throw new IOException("No centroid file found in distributed cache.");
             }
             String centroidFileName = new Path(cacheFiles[0].toString()).getName();
+            numDimensions = context.getConfiguration().getInt("numDimensions", numDimensions);
 
-            // similar to taskCMapper setup
+            // similar to taskBMapper setup
             BufferedReader br = new BufferedReader(new FileReader(centroidFileName));
             String line;
             while ((line = br.readLine()) != null) {
@@ -312,7 +319,7 @@ public class taskC {
         
         String centroidPath = "/user/ds503/centroids/centroids.txt";
         boolean result = true;
-        int k = 15;
+        int k = 40;
         int threshold = 2000;
         long startTime = System.nanoTime();
 
@@ -333,6 +340,7 @@ public class taskC {
             }
 
             conf.set("centroid.path", centroidPath);
+            conf.setInt("numDimensions", numDimensions);
             Job job = Job.getInstance(conf, "Iteration " + i);
             
             // job.setReduceSpeculativeExecution(false);
@@ -377,12 +385,20 @@ public class taskC {
                     shouldTerminate = false; 
                 }
 
-                System.out.println("Iteration " + i + " and centroids " + j + "     have distance " + minDist);
-                String centroidKey = currCentroids.get(j)[0] + "," + currCentroids.get(j)[1] + "," + currCentroids.get(j)[2] + "," + currCentroids.get(j)[3];
-                String prevCentroid = prevCentroids.get(j)[0] + "," + prevCentroids.get(j)[1] + "," + prevCentroids.get(j)[2] + "," + prevCentroids.get(j)[3];
-                System.out.println("curr centroid: " + centroidKey);
-                System.out.println("prev centroid: " + prevCentroid);
+                System.out.println("Iteration " + i + " and centroid " + j + "     have distance " + minDist);
 
+                StringBuilder currCentroidStr = new StringBuilder();
+                StringBuilder prevCentroidStr = new StringBuilder();
+                for (int d = 0; d < numDimensions; d++) {
+                    if (d > 0) {
+                        currCentroidStr.append(",");
+                        prevCentroidStr.append(",");
+                    }
+                    currCentroidStr.append(currCentroids.get(j)[d]);
+                    prevCentroidStr.append(prevCentroids.get(j)[d]);
+                }
+                System.out.println("curr centroid: " + currCentroidStr.toString());
+                System.out.println("prev centroid: " + prevCentroidStr.toString());
             }
 
             if(shouldTerminate) {
@@ -402,7 +418,8 @@ public class taskC {
         // SILOHUETTE JOB
         Configuration conf2 = new Configuration();
         Job job2 = Job.getInstance(conf2);
-                        
+        conf2.setInt("numDimensions", numDimensions);
+              
         long startTime2 = System.nanoTime();;
 
         job2.setJarByClass(taskC.class);
