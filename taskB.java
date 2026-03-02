@@ -32,6 +32,8 @@ hdfs dfs -cat /user/ds503/project2/part2/partB/silhouetteOutput/part-r-00000
 
 public class taskB {
     // SHARED MATH - EUCLIDEAN DISTANCE
+    int numDimensions = 4; //default
+
     // combined our inputs with someone elses function
     private static double euclideanDistance(double[] p1, double[] p2) {
         double sum = 0;
