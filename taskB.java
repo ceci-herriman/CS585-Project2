@@ -291,7 +291,7 @@ public class taskB {
 
         String centroidPath = "/user/ds503/centroids/centroids.txt";
         boolean result = true;
-        int k = 10;
+        int k = 5;
         long startTime = System.nanoTime();
 
         for(int i = 0; i < k; i++) {
@@ -327,6 +327,8 @@ public class taskB {
         double durationMilli = (double) (endTime - startTime) / 1000000.0;
         System.out.println("Time to complete in milliseconds: " + durationMilli);
 
+        System.exit(result ? 0 : 1);
+/*
         if (!result) {
             System.exit(1);
         }
@@ -360,6 +362,6 @@ public class taskB {
         System.out.println("Time to complete in milliseconds: " + durationMilli);
 
         System.exit(result2 ? 0 : 1);
-
+*/
     }
 }
