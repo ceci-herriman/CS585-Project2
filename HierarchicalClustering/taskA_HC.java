@@ -16,6 +16,18 @@ import java.io.OutputStreamWriter;
 import java.io.IOException;
 import java.util.*;
 
+/*compile and run instrutions I used:
+javac -classpath $(hadoop classpath) taskA_HC.java
+jar cf taskA_HC.jar taskA_HC*.class
+rm -rf ~/shared_folder/project2/part2/partA/output
+hdfs dfs -rm -r -f /user/ds503/project2/part2/partA/output
+hadoop jar taskA_HC.jar taskA_HC
+
+retrieve ouputs:
+cat ~/shared_folder/project2/part2/partA/output/part-r-00000
+cat ~/shared_folder/project2/part2/partA/silhouetteOutput/part-r-00000
+*/
+
 public class taskA_HC {
 
     // SHARED MATH
@@ -101,127 +113,122 @@ public class taskA_HC {
     }
 
     // DRIVER
-    public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException {
-        long startTime = System.nanoTime();
+public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException {
+    long startTime = System.nanoTime();
 
-        FileSystem fs = FileSystem.get(new Configuration());
+    Configuration conf = new Configuration();
+    FileSystem fs = FileSystem.get(conf);           // HDFS
+    FileSystem localFs = FileSystem.getLocal(conf); // Local
 
-        // Each point starts as its own cluster
-        List<double[]> centroids = new ArrayList<>();
-        BufferedReader dataReader = new BufferedReader(
-                new InputStreamReader(fs.open(new Path("file:///home/ds503/data.txt"))));
-        String dataLine;
-        while ((dataLine = dataReader.readLine()) != null) {
-            dataLine = dataLine.trim();
-            if (!dataLine.isEmpty()) centroids.add(stringToCentroid(dataLine));
-        }
-        dataReader.close();
-
-        // overwriting kseeds to keep track of all centroids
-        Path centroidHDFS = new Path("/user/ds503/centroids/kseeds.txt");
-        if (fs.exists(centroidHDFS)) fs.delete(centroidHDFS, false);
-        BufferedWriter initWriter = new BufferedWriter(new OutputStreamWriter(fs.create(centroidHDFS)));
-        for (double[] centroidDoubles : centroids) { initWriter.write(centroidToString(centroidDoubles)); initWriter.newLine(); }
-        initWriter.close();
-
-        // merge to closest other cluster until 1 cluster remains
-        int round = 0;
-        while (centroids.size() > 1) {
-            Path outPath = new Path("file:///home/ds503/shared_folder/project2/part2/partA/output/round_" + round);
-            if (fs.exists(outPath)) fs.delete(outPath, true);
-
-            Configuration conf = new Configuration();
-            Job job = Job.getInstance(conf);            
-            
-            job.setJarByClass(taskA_HC.class);
-
-            job.setMapperClass(HACMapper.class);
-            job.setReducerClass(HACReducer.class);
-
-            job.setMapOutputKeyClass(Text.class);
-            job.setMapOutputValueClass(Text.class);
-
-            job.setOutputKeyClass(Text.class);
-            job.setOutputValueClass(NullWritable.class);
-
-            FileInputFormat.setInputPaths(job, new Path("file:///home/ds503/data.txt"));
-            FileOutputFormat.setOutputPath(job, new Path("file:///home/ds503/shared_folder/project2/part2/partA/output/round_" + round));
-
-            boolean result = job.waitForCompletion(true);
-
-            if (!result) {
-                System.exit(1);
-            }
-
-            // Read from reducer output
-            centroids.clear();
-            BufferedReader roundReader = new BufferedReader(
-                    new InputStreamReader(fs.open(new Path("file:///home/ds503/shared_folder/project2/part2/partA/output/round_" + round + "/part-r-00000"))));
-            String roundLine;
-            while ((roundLine = roundReader.readLine()) != null) {
-                roundLine = roundLine.trim();
-                if (!roundLine.isEmpty()) centroids.add(stringToCentroid(roundLine));
-            }
-            roundReader.close();
-
-            // distance matrix: calc all possible distances
-            // find the shortest and merge those two clusters
-            int mergeA = -1, mergeB = -1;
-            double minDistance = Double.MAX_VALUE;
-            for (int i = 0; i < centroids.size(); i++) {
-                for (int j = i + 1; j < centroids.size(); j++) {
-                    double distance = euclideanDistance(centroids.get(i), centroids.get(j));
-                    if (distance < minDistance) { minDistance = distance; mergeA = i; mergeB = j; }
-                }
-            }
-            if (mergeA < 0) break;
-
-            double[] cA = centroids.get(mergeA);
-            double[] cB = centroids.get(mergeB);
-            double[] merged = new double[4];
-            for (int i = 0; i < 4; i++) merged[i] = (cA[i] + cB[i]) / 2.0;
-
-            //single link merge: only keep the closest point to the other clusters
-            centroids.remove(Math.max(mergeA, mergeB));
-            centroids.remove(Math.min(mergeA, mergeB));
-            centroids.add(merged);
-
-            // overwrite kseeds with new centroids for next round
-            if (fs.exists(centroidHDFS)) fs.delete(centroidHDFS, false);
-            BufferedWriter roundWriter = new BufferedWriter(new OutputStreamWriter(fs.create(centroidHDFS)));
-            for (double[] centroidDoubles : centroids) { roundWriter.write(centroidToString(centroidDoubles)); roundWriter.newLine(); }
-            roundWriter.close();
-
-            round++;
-        }
-
-        // JOB 2: Final pass
-        Path finalOutPath = new Path("file:///home/ds503/shared_folder/project2/part2/partA/output/HC_final");
-        if (fs.exists(finalOutPath)) fs.delete(finalOutPath, true);
-
-        Configuration conf2 = new Configuration();
-        Job job2 = Job.getInstance(conf2);        
-        
-        job2.setJarByClass(taskA_HC.class);
-
-        job2.setMapperClass(HACMapper.class);
-        job2.setReducerClass(HACReducer.class);
-
-        job2.setMapOutputKeyClass(Text.class);
-        job2.setMapOutputValueClass(Text.class);
-
-        job2.setOutputKeyClass(Text.class);
-        job2.setOutputValueClass(NullWritable.class);
-
-        FileInputFormat.setInputPaths(job2, new Path("file:///home/ds503/data.txt"));
-        FileOutputFormat.setOutputPath(job2, new Path("file:///home/ds503/shared_folder/project2/part2/partA/output/HC_final"));
-
-        boolean result = job2.waitForCompletion(true);
-
-        long endTime = System.nanoTime();
-        double durationMilli = (double)(endTime - startTime) / 1000000.0;
-        System.out.println("Time to complete in milliseconds: " + durationMilli);
-        
-        System.exit(result ? 0 : 1);
+    // Each point starts as its own cluster
+    List<double[]> centroids = new ArrayList<>();
+    BufferedReader dataReader = new BufferedReader(
+            new InputStreamReader(localFs.open(new Path("file:///home/ds503/dataHC.txt"))));
+    String dataLine;
+    while ((dataLine = dataReader.readLine()) != null) {
+        dataLine = dataLine.trim();
+        if (!dataLine.isEmpty()) centroids.add(stringToCentroid(dataLine));
     }
+    dataReader.close();
+
+    // Write initial centroids to HDFS
+    Path centroidHDFS = new Path("/user/ds503/centroids/kseeds.txt");
+    if (fs.exists(centroidHDFS)) fs.delete(centroidHDFS, false);
+    BufferedWriter initWriter = new BufferedWriter(new OutputStreamWriter(fs.create(centroidHDFS)));
+    for (double[] c : centroids) { initWriter.write(centroidToString(c)); initWriter.newLine(); }
+    initWriter.close();
+
+    // Merge until 1 cluster remains
+    int round = 0;
+    while (centroids.size() > 1) {
+        String outputPath = "/user/ds503/project2/part2/partA/output/output_round_" + round;
+        Path outPath = new Path(outputPath);
+        if (fs.exists(outPath)) fs.delete(outPath, true);
+
+        Configuration roundConf = new Configuration();
+        Job job = Job.getInstance(roundConf, "HC Round " + round);
+
+        job.setJarByClass(taskA_HC.class);
+        job.setMapperClass(HACMapper.class);
+        job.setReducerClass(HACReducer.class);
+
+        job.setMapOutputKeyClass(Text.class);
+        job.setMapOutputValueClass(Text.class);
+        job.setOutputKeyClass(Text.class);
+        job.setOutputValueClass(NullWritable.class);
+
+        FileInputFormat.setInputPaths(job, new Path("file:///home/ds503/dataHC.txt"));
+        FileOutputFormat.setOutputPath(job, outPath);
+
+        boolean result = job.waitForCompletion(true);
+        if (!result) System.exit(1);
+
+        // Read new centroids from HDFS output
+        centroids.clear();
+        BufferedReader roundReader = new BufferedReader(
+                new InputStreamReader(fs.open(new Path(outputPath + "/part-r-00000"))));
+        String roundLine;
+        while ((roundLine = roundReader.readLine()) != null) {
+            roundLine = roundLine.trim();
+            if (!roundLine.isEmpty()) centroids.add(stringToCentroid(roundLine));
+        }
+        roundReader.close();
+
+        // Find closest pair and merge
+        int mergeA = -1, mergeB = -1;
+        double minDistance = Double.MAX_VALUE;
+        for (int i = 0; i < centroids.size(); i++) {
+            for (int j = i + 1; j < centroids.size(); j++) {
+                double distance = euclideanDistance(centroids.get(i), centroids.get(j));
+                if (distance < minDistance) { minDistance = distance; mergeA = i; mergeB = j; }
+            }
+        }
+        if (mergeA < 0) break;
+
+        double[] cA = centroids.get(mergeA);
+        double[] cB = centroids.get(mergeB);
+        double[] merged = new double[4];
+        for (int i = 0; i < 4; i++) merged[i] = (cA[i] + cB[i]) / 2.0;
+
+        centroids.remove(Math.max(mergeA, mergeB));
+        centroids.remove(Math.min(mergeA, mergeB));
+        centroids.add(merged);
+
+        // Overwrite kseeds with updated centroids for next round
+        if (fs.exists(centroidHDFS)) fs.delete(centroidHDFS, false);
+        BufferedWriter roundWriter = new BufferedWriter(new OutputStreamWriter(fs.create(centroidHDFS)));
+        for (double[] c : centroids) { roundWriter.write(centroidToString(c)); roundWriter.newLine(); }
+        roundWriter.close();
+
+        round++;
+    }
+
+    // Final pass
+    String finalOutputPath = "/user/ds503/project2/part2/partA/output/HC_final";
+    Path finalOutPath = new Path(finalOutputPath);
+    if (fs.exists(finalOutPath)) fs.delete(finalOutPath, true);
+
+    Configuration conf2 = new Configuration();
+    Job job2 = Job.getInstance(conf2, "HC Final");
+
+    job2.setJarByClass(taskA_HC.class);
+    job2.setMapperClass(HACMapper.class);
+    job2.setReducerClass(HACReducer.class);
+
+    job2.setMapOutputKeyClass(Text.class);
+    job2.setMapOutputValueClass(Text.class);
+    job2.setOutputKeyClass(Text.class);
+    job2.setOutputValueClass(NullWritable.class);
+
+    FileInputFormat.setInputPaths(job2, new Path("file:///home/ds503/dataHC.txt"));
+    FileOutputFormat.setOutputPath(job2, finalOutPath);
+
+    boolean result = job2.waitForCompletion(true);
+
+    long endTime = System.nanoTime();
+    double durationMilli = (double)(endTime - startTime) / 1000000.0;
+    System.out.println("Time to complete in milliseconds: " + durationMilli);
+
+    System.exit(result ? 0 : 1);
 }
+} 
