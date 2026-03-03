@@ -236,16 +236,13 @@ public class taskE {
         SILHOUETTE ANALYSIS
     */
 
-    // SILHOUETTE MAPPER - similar to taskEMapper but the input file is the result of the knn job
-    public static class SilhouetteMapper extends Mapper<Object, Text, Text, Text> {
+    // SILHOUETTE MAPPER - optimized to 1 Map only job to remove shuffling
+    public static class SilhouetteMapper extends Mapper<Object, Text, Text, NullWritable> {
         List<double[]> allCentroids = new ArrayList<>();
 
         protected void setup(Context context) throws IOException, InterruptedException {
             // load job1 centroid output
             URI[] cacheFiles = context.getCacheFiles();
-            if (cacheFiles == null || cacheFiles.length == 0) {
-                throw new IOException("No centroid file found in distributed cache.");
-            }
             String centroidFileName = new Path(cacheFiles[0].toString()).getName();
 
             // modified from taskEMapper
@@ -271,104 +268,40 @@ public class taskE {
                 pointDoubles[i] = Double.parseDouble(vals[i]);
             }
 
-            // for each seed in seedsList, calculate distance from point
+            // for each seed in seedsList, calculate distance from point (a)
             int closest = 0; // track closest seed
-            double minDistance = euclideanDistance(pointDoubles, allCentroids.get(0)); // get distance from first seed to point
+            double a = euclideanDistance(pointDoubles, allCentroids.get(0)); // get distance from first seed to point
             for (int i = 1; i < allCentroids.size(); i++) {
                 double distance = euclideanDistance(pointDoubles, allCentroids.get(i));
-                if (distance < minDistance) {
-                    minDistance = distance;
+                if (distance < a) {
+                    a = distance;
                     closest = i;
                 }
             }
 
-            // now we have the index of which cluster the point belongs to
-            // return <seed, line>
-            double[] seed = allCentroids.get(closest);
-            String clusterKey = seed[0] + "," + seed[1] + "," + seed[2] + "," + seed[3];
-
-            context.write(new Text(clusterKey), value);
-        }
-    }
-
-    // SILHOUETTE REDUCER
-    public static class SilhouetteReducer extends Reducer<Text, Text, Text, NullWritable> {
-        List<double[]> allCentroids = new ArrayList<>();
-
-        protected void setup(Context context) throws IOException, InterruptedException {
-            // load centroids output from job 1 - written with claude
-            URI[] cacheFiles = context.getCacheFiles();
-            if (cacheFiles == null || cacheFiles.length == 0) {
-                throw new IOException("No centroid file found in distributed cache.");
-            }
-            String centroidFileName = new Path(cacheFiles[0].toString()).getName();
-
-            // similar to taskEMapper setup
-            BufferedReader br = new BufferedReader(new FileReader(centroidFileName));
-            String line;
-            while ((line = br.readLine()) != null) {
-                if (line.isEmpty())
-                    continue;
-                String[] vals = line.split(",");
-                double[] centroidDouble = new double[4];
-                for (int i = 0; i < 4; i++) {
-                    centroidDouble[i] = Double.parseDouble(vals[i]);
-                }
-                allCentroids.add(centroidDouble);
-            }
-            br.close();
-        }
-
-        public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
-            // get cluster's centroid from key
-            String[] keyVals = key.toString().split(",");
-            double[] currentCentroid = new double[4];
-            for (int i = 0; i < 4; i++) {
-                currentCentroid[i] = Double.parseDouble(keyVals[i]);
-            }
-
-            List<double[]> clusterPoints = new ArrayList<>();
-            for (Text val : values) {
-                String[] valueStrings = val.toString().trim().split(",");
-                double[] pointDoubles = new double[4];
-                for (int i = 0; i < 4; i++) {
-                    pointDoubles[i] = Double.parseDouble(valueStrings[i]);
-                }
-                clusterPoints.add(pointDoubles);
-            }
-
-            //list of other centroids (except this cluster's centroid)
-            List<double[]> otherCentroids = new ArrayList<>();
-            for (double[] centroidDoubles : allCentroids) {
-                if (!Arrays.equals(centroidDoubles, currentCentroid)) {
-                    otherCentroids.add(centroidDoubles);
+            // get distance to nearett other centroid (b)
+            double b = Double.MAX_VALUE;
+            for (int i = 0; i < allCentroids.size(); i++) {
+                if (i != closest) {
+                    double dist = euclideanDistance(pointDoubles, allCentroids.get(i));
+                    if (dist < b)
+                        b = dist;
                 }
             }
+            if (b == Double.MAX_VALUE)
+                b = 0;
 
             double silhouetteSum = 0.0;
-
-            for (double[] point : clusterPoints) {
-                double a = averageDistance(point, clusterPoints, true);
-                double b = Double.MAX_VALUE;
-                for (double[] otherCentroid : otherCentroids) {
-                    double dist = euclideanDistance(point, otherCentroid);
-                    b = Math.min(b, dist);
-                }
-                if (b == Double.MAX_VALUE)
-                    b = 0;
-                
-                // formula is (b - a) / max(a, b)
-                double s; 
-                if (a == 0 && b == 0) {
-                    s = 0;
-                } else {
-                    s = (b - a) / Math.max(a, b);
-                }
-                silhouetteSum += s;
+            // formula is (b - a) / max(a, b)
+            double s;
+            if (a == 0 && b == 0) {
+                s = 0;
+            } else {
+                s = (b - a) / Math.max(a, b);
             }
+            silhouetteSum += s;
 
-            double avgSilhouette = silhouetteSum / clusterPoints.size();
-            context.write(new Text(String.valueOf(avgSilhouette)), NullWritable.get());
+            context.write(new Text(String.valueOf(silhouetteSum)), NullWritable.get());
         }
     }
 
@@ -377,8 +310,8 @@ public class taskE {
 
         String centroidPath = "/user/ds503/centroids/centroids.txt";
         boolean result = true;
-        int k = 3;
-        int threshold = 2;        
+        int k = 5;
+        int threshold = 2000;        
         long startTime = System.nanoTime();
 
 
@@ -502,10 +435,9 @@ public class taskE {
 
         // simple version
         job2.setMapperClass(SilhouetteMapper.class);
-        job2.setReducerClass(SilhouetteReducer.class);
 
         job2.setMapOutputKeyClass(Text.class);
-        job2.setMapOutputValueClass(Text.class);
+        job2.setMapOutputValueClass(NullWritable.class);
 
         job2.setOutputKeyClass(Text.class);
         job2.setOutputValueClass(NullWritable.class);
