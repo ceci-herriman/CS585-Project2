@@ -55,9 +55,10 @@ public class taskD {
         return count == 0 ? 0 : sum / count;
     }
     
-    // MAPPER
+    // MAPPER -optimized with hashmap and partial sums
     public static class taskDMapper extends Mapper<Object, Text, Text, Text>{
         List<double[]> seedsList = new ArrayList<>();
+        HashMap<String, double[]> partialSums = new HashMap<>();
 
         protected void setup(Context context) throws IOException, InterruptedException {
             //BufferedReader br = new BufferedReader(new FileReader("kseeds.txt"));
@@ -91,7 +92,6 @@ public class taskD {
             }
 
             //for each seed in seedsList, calculate distance from point
-
             int closest = 0; //track closest seed
             double minDistance = euclideanDistance(pointDoubles, seedsList.get(0)); //get distance from first seed to point
             for (int i = 1; i < seedsList.size(); i++) {
@@ -107,9 +107,51 @@ public class taskD {
             double[] seed = seedsList.get(closest);
             String centroidKey = seed[0] + "," + seed[1] + "," + seed[2] + "," + seed[3];
 
-            context.write(new Text(centroidKey), value);
+            // put partial sums in hashmap
+            double[] accumulate = partialSums.get(centroidKey);
+            if (accumulate == null) {
+                accumulate = new double[5]; // wxyz, count]
+                partialSums.put(centroidKey, accumulate);
+            }
+            accumulate[0] += pointDoubles[0];
+            accumulate[1] += pointDoubles[1];
+            accumulate[2] += pointDoubles[2];
+            accumulate[3] += pointDoubles[3];
+            accumulate[4] += 1;
+        }
+            protected void cleanup(Context context) throws IOException, InterruptedException {
+            for (Map.Entry<String, double[]> entry : partialSums.entrySet()) {
+                double[] accumulate = entry.getValue();
+                String partialVal = accumulate[0] + "," + accumulate[1] + "," + accumulate[2] + "," + accumulate[3] + "," + (double) accumulate[4];
+                context.write(new Text(entry.getKey()), new Text(partialVal));
+            }
         }
     }
+
+    // COMBINER
+    public static class taskDCombiner extends Reducer<Text, Text, Text, Text> {
+        public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
+            double totalW = 0;
+            double totalX = 0;
+            double totalY = 0;
+            double totalZ = 0;
+            long count = 0;
+
+            for (Text val : values) {
+                String[] sList = val.toString().split(",");
+                totalW += Double.parseDouble(sList[0]);
+                totalX += Double.parseDouble(sList[1]);
+                totalY += Double.parseDouble(sList[2]);
+                totalZ += Double.parseDouble(sList[3]);
+                count += Long.parseLong(sList[4]);
+            }
+
+            String combinedVal = totalW + "," + totalX + "," + totalY + "," + totalZ + "," + count;
+            context.write(key, new Text(combinedVal));
+        }
+    }
+
+
 
     // REDUCER
      public static class taskDReducer extends Reducer<Text,Text,Text,NullWritable> {
@@ -120,7 +162,7 @@ public class taskD {
             double totalX = 0;
             double totalY = 0;
             double totalZ = 0;
-            int size = 0;
+            long totalCount = 0;            
 
             for (Text val : values) {
                 String[] sList = val.toString().split(",");
@@ -128,14 +170,16 @@ public class taskD {
                 totalX += Double.parseDouble(sList[1]);
                 totalY += Double.parseDouble(sList[2]);
                 totalZ += Double.parseDouble(sList[3]);
-                size++;
+                totalCount += Long.parseLong(sList[4]);            
             }
 
+
             String newCentroid =
-                (totalW / size) + "," +
-                (totalX / size) + "," +
-                (totalY / size) + "," +
-                (totalZ / size);
+                (totalW / totalCount) + "," +
+                (totalX / totalCount) + "," +
+                (totalY / totalCount) + "," +
+                (totalZ / totalCount);
+                
             context.write(new Text(newCentroid), NullWritable.get()); //text is centroid "id" and nullwritable contains the wxyz coords
         }
     }
@@ -163,7 +207,7 @@ public class taskD {
     }
 
 
-/*
+    /*
         SILHOUETTE ANALYSIS
     */
 
@@ -238,7 +282,7 @@ public class taskD {
 
     public static void main(String[] args) throws IOException, InterruptedException, ClassNotFoundException, java.net.URISyntaxException {
 
-        String centroidPath = "/user/ds503/centroids/centroids.txt";
+        String centroidPath = "/user/ds503/centroids/kseeds2.txt";
         boolean result = true;
         int k = 5;
         int threshold = 2000;
@@ -268,6 +312,7 @@ public class taskD {
             job.setJarByClass(taskD.class);
     
             job.setMapperClass(taskDMapper.class);
+            job.setCombinerClass(taskDCombiner.class);
             job.setReducerClass(taskDReducer.class);
     
             job.setMapOutputKeyClass(Text.class);
@@ -323,11 +368,13 @@ public class taskD {
         double durationMilli = (double) (endTime - startTime) / 1000000.0;
         System.out.println("Time to complete in milliseconds: " + durationMilli);
 
-        if (!result) {
+        /*if (!result) {
             System.exit(1);
-        }
+        }*/
+        System.exit(result ? 0 : 1);
 
         // SILOHUETTE JOB
+        /*
         Configuration conf2 = new Configuration();
         Job job2 = Job.getInstance(conf2);
                         
@@ -354,6 +401,6 @@ public class taskD {
         durationMilli = (double) (endTime2 - startTime2) / 1000000.0;
         System.out.println("Time to complete in milliseconds: " + durationMilli);
 
-        System.exit(result2 ? 0 : 1);
+        System.exit(result2 ? 0 : 1);*/
     }
 }
