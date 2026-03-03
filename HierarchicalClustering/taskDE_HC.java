@@ -17,18 +17,18 @@ import java.io.IOException;
 import java.util.*;
 
 /*compile and run instrutions I used:
-javac -classpath $(hadoop classpath) taskD_HC.java
-jar cf taskD_HC.jar taskD_HC*.class
+javac -classpath $(hadoop classpath) taskDE_HC.java
+jar cf taskDE_HC.jar taskDE_HC*.class
 rm -rf ~/shared_folder/project2/part2/partA/output
 hdfs dfs -rm -r -f /user/ds503/project2/part2/partA/output
-hadoop jar taskD_HC.jar taskD_HC
+hadoop jar taskDE_HC.jar taskDE_HC
 
 retrieve ouputs:
 cat ~/shared_folder/project2/part2/partA/output/part-r-00000
 cat ~/shared_folder/project2/part2/partA/silhouetteOutput/part-r-00000
 */
 
-public class taskD_HC {
+public class taskDE_HC {
 
     // SHARED MATH
     private static double euclideanDistance(double[] p1, double[] p2) {
@@ -209,7 +209,7 @@ public class taskD_HC {
             Configuration roundConf = new Configuration();
             Job job = Job.getInstance(roundConf, "HC Round " + round);
 
-            job.setJarByClass(taskD_HC.class);
+            job.setJarByClass(taskDE_HC.class);
 
             job.setMapperClass(HCMapper.class);
             job.setCombinerClass(HCCombiner.class);
@@ -290,7 +290,7 @@ public class taskD_HC {
         Configuration conf2 = new Configuration();
         Job job2 = Job.getInstance(conf2, "HC Final");
 
-        job2.setJarByClass(taskD_HC.class);
+        job2.setJarByClass(taskDE_HC.class);
 
         job2.setMapperClass(HCMapper.class);
         job2.setCombinerClass(HCCombiner.class);
@@ -310,7 +310,7 @@ public class taskD_HC {
         long endTime = System.nanoTime();
         double durationMilli = (double) (endTime - startTime) / 1000000.0;
 
-        // taskD, taskB, taskC -
+        // taskDE, taskB, taskC -
         // number of iterations is always the same (keep merging until 1 cluster exists is what HC is)
         System.out.println("Number of rounds to complete: " + round);
         //extract output for task e

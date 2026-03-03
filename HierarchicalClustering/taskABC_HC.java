@@ -167,7 +167,7 @@ public class taskABC_HC {
             job.setOutputValueClass(NullWritable.class);
 
             FileInputFormat.setInputPaths(job,
-                new Path("file:///home/ds503/dataHC.txt")); // I only used 200 points because there will always be n-1 iterations, and 6000 is too long for me
+                new Path("file:///home/ds503/dataHC.txt")); // I only used up to 200 points because there will always be n-1 iterations, and 6000 is too long for me
             FileOutputFormat.setOutputPath(job, outPath);
 
             boolean result = job.waitForCompletion(true);
@@ -257,6 +257,7 @@ public class taskABC_HC {
         // taskABC, taskB, taskC -
         // number of iterations is always the same (keep merging until 1 cluster exists is what HC is)
         System.out.println("Number of rounds to complete: " + round);
+        System.out.println("Final cluster centroid: " + centroidToString(centroids.get(0)));
         System.out.println("Time to complete in milliseconds: " + durationMilli);
 
         System.exit(result ? 0 : 1);
