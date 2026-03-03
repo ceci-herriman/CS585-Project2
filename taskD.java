@@ -19,18 +19,18 @@ import java.util.*;
 import java.net.URI;
 
 /*compile and run instrutions I used: 
-javac -classpath $(hadoop classpath) taskC.java
-jar cf taskC.jar taskC*.class
-hdfs dfs -rm -r -f /user/ds503/project2/part2/partC/output
-hdfs dfs -rm -r -f /user/ds503/project2/part2/partC/silhouetteOutput
-hadoop jar taskC.jar taskC
+javac -classpath $(hadoop classpath) taskD.java
+jar cf taskD.jar taskD*.class
+hdfs dfs -rm -r -f /user/ds503/project2/part2/partD/output
+hdfs dfs -rm -r -f /user/ds503/project2/part2/partD/silhouetteOutput
+hadoop jar taskD.jar taskD
 
 View results:
-hdfs dfs -cat /user/ds503/project2/part2/partC/output/output_iteration_1/part-r-00000
-hdfs dfs -cat /user/ds503/project2/part2/partC/silhouetteOutput/part-r-00000
+hdfs dfs -cat /user/ds503/project2/part2/partD/output/output_iteration_1/part-r-00000
+hdfs dfs -cat /user/ds503/project2/part2/partD/silhouetteOutput/part-r-00000
 */
 
-public class taskC {
+public class taskD {
     // SHARED MATH - EUCLIDEAN DISTANCE
     // combined our inputs with someone elses function
     private static double euclideanDistance(double[] p1, double[] p2) {
@@ -56,7 +56,7 @@ public class taskC {
     }
     
     // MAPPER
-    public static class taskCMapper extends Mapper<Object, Text, Text, Text>{
+    public static class taskDMapper extends Mapper<Object, Text, Text, Text>{
         List<double[]> seedsList = new ArrayList<>();
 
         protected void setup(Context context) throws IOException, InterruptedException {
@@ -112,7 +112,7 @@ public class taskC {
     }
 
     // REDUCER
-     public static class taskCReducer extends Reducer<Text,Text,Text,NullWritable> {
+     public static class taskDReducer extends Reducer<Text,Text,Text,NullWritable> {
 
         public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
             String centroid = key.toString(); 
@@ -176,7 +176,7 @@ public class taskC {
             URI[] cacheFiles = context.getCacheFiles();
             String centroidFileName = new Path(cacheFiles[0].toString()).getName();
 
-            // modified from taskEMapper
+            // modified from taskDMapper
             BufferedReader br = new BufferedReader(new FileReader(centroidFileName));
             String line;
             while ((line = br.readLine()) != null) {
@@ -265,10 +265,10 @@ public class taskC {
             
             // job.setReduceSpeculativeExecution(false);
     
-            job.setJarByClass(taskC.class);
+            job.setJarByClass(taskD.class);
     
-            job.setMapperClass(taskCMapper.class);
-            job.setReducerClass(taskCReducer.class);
+            job.setMapperClass(taskDMapper.class);
+            job.setReducerClass(taskDReducer.class);
     
             job.setMapOutputKeyClass(Text.class);
             job.setMapOutputValueClass(Text.class);
@@ -278,7 +278,7 @@ public class taskC {
             
             FileInputFormat.setInputPaths(job, new Path("file:///home/ds503/data.txt"));
     
-            String outputPath = "/user/ds503/project2/part2/partC/output/output_iteration_" + i;
+            String outputPath = "/user/ds503/project2/part2/partD/output/output_iteration_" + i;
             FileOutputFormat.setOutputPath(job, new Path(outputPath));
     
             result = job.waitForCompletion(true);
@@ -333,7 +333,7 @@ public class taskC {
                         
         long startTime2 = System.nanoTime();
 
-        job2.setJarByClass(taskE.class);
+        job2.setJarByClass(taskD.class);
 
         // simple version
         job2.setMapperClass(SilhouetteMapper.class);
@@ -346,7 +346,7 @@ public class taskC {
 
         FileInputFormat.setInputPaths(job2, new Path("file:///home/ds503/data.txt"));
         job2.addCacheFile(new URI(centroidPath)); // add final interation output of job 1 to cache
-        FileOutputFormat.setOutputPath(job2, new Path("/user/ds503/project2/part2/partE/silhouetteOutput"));
+        FileOutputFormat.setOutputPath(job2, new Path("/user/ds503/project2/part2/partD/silhouetteOutput"));
 
         boolean result2 = job2.waitForCompletion(true);
                 
